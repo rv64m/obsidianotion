@@ -1,75 +1,180 @@
-# Obsidian Sample Plugin
+# Obsidianotion - Notion to Obsidian Sync Plugin
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+A comprehensive Obsidian plugin that syncs your Notion workspace to Obsidian with intelligent folder mapping and file organization.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Features
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+### 🔄 Intelligent Sync
+- **Hierarchical Mapping**: 
+  - Root pages → Obsidian folders
+  - Sub-pages → Markdown files  
+  - Database pages → folders with database entries as markdown files
+- **Incremental Sync**: Only updates changed content
+- **Bidirectional Detection**: Handles page moves and deletions in Notion
 
-## First time developing plugins?
+### 🗂️ Advanced Organization
+- **Root Folder Configuration**: Organize all synced content under a custom directory
+- **Image Management**: Automatic image download with configurable storage paths
+- **Path Independence**: Images and content use separate, configurable folder structures
 
-Quick starting guide for new plugin devs:
+### 🔧 Smart Features
+- **Auto Delete**: Removes files in Obsidian when corresponding Notion pages are deleted
+- **Move Detection**: Automatically relocates files when page hierarchy changes in Notion
+- **Duplicate Prevention**: Avoids re-downloading existing images and content
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## Setup
 
-## Releasing new releases
+### Prerequisites
+1. **Notion Integration**: Create a Notion integration at https://www.notion.so/my-integrations
+2. **Database Access**: Share your Notion databases/pages with the integration
+3. **Obsidian**: Version 1.0.0 or higher
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+### Installation
+1. Download and extract the plugin files to your vault's `.obsidian/plugins/obsidiantion/` folder
+2. Enable the plugin in Obsidian Settings → Community Plugins
+3. Configure your Notion integration token in the plugin settings
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## Configuration
 
-## Adding your plugin to the community plugin list
+### Basic Setup
+1. **Notion Secret Key**: Paste your Notion Internal Integration Token
+2. **Root Folder Path**: (Optional) Set a base directory for all synced content
+   - Leave empty to sync to vault root
+   - Example: `Notion` creates all content under a `Notion/` folder
+3. **Image Folder Path**: Set where downloaded images are stored
+   - Default: `attachments`
+   - Independent of root folder path
+4. **Auto Sync Interval**: Configure automatic sync frequency (0-120 minutes)
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+### Advanced Options
+- **Auto Delete Missing Pages**: Automatically remove files when Notion pages are deleted
+- **Manual Sync**: Use "Sync Now" button for immediate synchronization
 
-## How to use
+## Usage
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+### First Time Sync
+1. Configure your Notion secret key in plugin settings
+2. Set your preferred folder structure (root folder and image folder)
+3. Click "Sync Now" to perform initial synchronization
+4. Check the console (Developer Tools) for detailed sync logs
 
-## Manually installing the plugin
+### Ongoing Usage
+- **Automatic Sync**: Enable auto-sync for hands-off operation
+- **Manual Sync**: Use "Sync Now" when you need immediate updates
+- **File Organization**: Files automatically organize based on Notion hierarchy
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+## File Organization Examples
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
+### Default Configuration
+```
+Root Folder Path: (empty)
+Image Folder Path: attachments
+```
 
-## Funding URL
+Result:
+```
+Obsidian Vault/
+├── Work Project/           ← Notion root page
+│   ├── Meeting Notes.md    ← Notion sub-page
+│   └── Tasks Database/     ← Notion database
+│       ├── Task 1.md       ← Database entry
+│       └── Task 2.md       ← Database entry
+├── Personal/               ← Another root page
+│   └── Ideas.md
+└── attachments/            ← Images (independent)
+    ├── image1.png
+    └── image2.jpg
+```
 
-You can include funding URLs where people who use your plugin can financially support it.
+### Custom Root Folder
+```
+Root Folder Path: Notion
+Image Folder Path: media
+```
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+Result:
+```
+Obsidian Vault/
+├── Notion/                 ← All content under custom root
+│   ├── Work Project/
+│   │   ├── Meeting Notes.md
+│   │   └── Tasks Database/
+│   │       ├── Task 1.md
+│   │       └── Task 2.md
+│   └── Personal/
+│       └── Ideas.md
+└── media/                  ← Images in separate location
+    ├── image1.png
+    └── image2.jpg
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Sync Errors
+- **"Notion client not configured"**: Add your Notion integration token
+- **"Failed to execute 'fetch'"**: Plugin uses Obsidian's built-in network APIs for compatibility
+- **"Permission denied"**: Ensure your Notion integration has access to the databases/pages
+
+#### File Organization
+- **Files not in root folder**: Check that root folder path is configured correctly
+- **Images in wrong location**: Verify image folder path setting (independent of root folder)
+- **Old files not moved**: Plugin doesn't automatically relocate existing files when changing settings
+
+#### Performance
+- **Slow sync**: Large workspaces may take time; check console for progress
+- **Memory issues**: Restart Obsidian if sync fails repeatedly
+
+### Debug Mode
+1. Open Developer Tools (`Cmd+Option+I` on Mac, `Ctrl+Shift+I` on Windows)
+2. Switch to Console tab
+3. Run sync and observe detailed logs
+4. Look for setting values and path construction messages
+
+### Reset Configuration
+If issues persist:
+1. Close Obsidian
+2. Delete `.obsidian/plugins/obsidiantion/data.json`
+3. Restart Obsidian and reconfigure the plugin
+
+## Development
+
+### Building from Source
+```bash
+# Install dependencies
+npm install
+
+# Development build (watch mode)
+npm run dev
+
+# Production build
+npm run build
+```
+
+### Project Structure
+- `main.ts`: Core plugin implementation
+- `manifest.json`: Plugin metadata
+- `package.json`: Build configuration
+
+## Support
+
+### Getting Help
+For issues or questions:
+1. Check the troubleshooting section above
+2. Enable debug mode and check console logs
+3. Provide the following when reporting issues:
+   - Console logs
+   - Plugin settings screenshot
+   - Vault file structure
+   - Operating system information
+
+### Contributing
+Contributions are welcome! Please feel free to submit issues and enhancement requests.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ```json
 {

@@ -7,6 +7,7 @@ interface NotionSyncSettings {
 	autoDeleteMissingPages: boolean;
 	rootFolderPath: string; // Root folder for all synced content (empty = vault root)
 	imageFolderPath: string; // Path for storing images (empty = root)
+	filteredPageIds: string[]; // List of Notion page IDs to exclude from sync
 	syncedPages: Record<string, { path: string; lastModified: string; notionId: string }>;
 	syncedImages: Record<string, { path: string; notionUrl: string; hash: string }>; // Track synced images
 }
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: NotionSyncSettings = {
 	autoDeleteMissingPages: true,
 	rootFolderPath: '',
 	imageFolderPath: 'attachments',
+	filteredPageIds: [],
 	syncedPages: {},
 	syncedImages: {}
 }
@@ -197,6 +199,12 @@ export default class ObsidiantionPlugin extends Plugin {
 						(page.parent.type === 'page_id' ? page.parent.page_id :
 							page.parent.type === 'database_id' ? page.parent.database_id : undefined) : undefined;
 
+					// Skip filtered pages
+					if (this.isPageFiltered(page.id)) {
+						console.log(`Skipping filtered page: ${title} (${page.id})`);
+						continue;
+					}
+
 					pages.push({
 						id: page.id,
 						title: title,
@@ -233,6 +241,12 @@ export default class ObsidiantionPlugin extends Plugin {
 					const parent = 'parent' in db && db.parent && db.parent.type === 'page_id' ?
 						db.parent.page_id : undefined;
 
+					// Skip filtered databases
+					if (this.isPageFiltered(db.id)) {
+						console.log(`Skipping filtered database: ${title} (${db.id})`);
+						continue;
+					}
+
 					pages.push({
 						id: db.id,
 						title: title,
@@ -254,9 +268,9 @@ export default class ObsidiantionPlugin extends Plugin {
 		const deletedPages: string[] = [];
 		const filesToDelete: string[] = [];
 
-		// Find pages that were previously synced but no longer exist in Notion
+		// Find pages that were previously synced but no longer exist in Notion OR are now filtered out
 		for (const [pageId, syncRecord] of Object.entries(this.settings.syncedPages)) {
-			if (!currentPageIds.has(pageId)) {
+			if (!currentPageIds.has(pageId) || this.isPageFiltered(pageId)) {
 				deletedPages.push(pageId);
 				filesToDelete.push(syncRecord.path);
 			}
@@ -266,7 +280,7 @@ export default class ObsidiantionPlugin extends Plugin {
 			return;
 		}
 
-		new Notice(`Found ${deletedPages.length} deleted pages, removing from Obsidian...`);
+		new Notice(`Found ${deletedPages.length} deleted/filtered pages, removing from Obsidian...`);
 
 		// Remove files from Obsidian vault
 		for (const filePath of filesToDelete) {
@@ -295,7 +309,7 @@ export default class ObsidiantionPlugin extends Plugin {
 		await this.saveSettings();
 
 		if (deletedPages.length > 0) {
-			new Notice(`Removed ${deletedPages.length} deleted pages from Obsidian`);
+			new Notice(`Removed ${deletedPages.length} deleted/filtered pages from Obsidian`);
 		}
 	}
 
@@ -570,7 +584,16 @@ export default class ObsidiantionPlugin extends Plugin {
 	async getPageContent(page: NotionPage): Promise<string> {
 		try {
 			const blocks = await this.getPageBlocks(page.id);
+			const properties = await this.getPageProperties(page.id);
+
 			let content = `# ${page.title}\n\n`;
+
+			// Add tags from select properties
+			const tags = this.extractTagsFromProperties(properties);
+			if (tags.length > 0) {
+				content += tags.map(tag => `#${tag}`).join(' ') + '\n\n';
+			}
+
 			content += `> Synced from Notion on ${new Date().toISOString()}\n\n`;
 			content += this.convertBlocksToMarkdown(blocks);
 			return content;
@@ -602,6 +625,58 @@ export default class ObsidiantionPlugin extends Plugin {
 		} while (cursor);
 
 		return blocks;
+	}
+
+	async getPageProperties(pageId: string): Promise<any> {
+		try {
+			const response = await this.makeNotionRequest(`pages/${pageId}`);
+			return response.properties || {};
+		} catch (error) {
+			console.error(`Failed to get properties for page ${pageId}:`, error);
+			return {};
+		}
+	}
+
+	extractTagsFromProperties(properties: any): string[] {
+		const tags: string[] = [];
+
+		// Iterate through all properties
+		for (const [propertyName, property] of Object.entries(properties)) {
+			const prop = property as any;
+
+			// Check for select property type
+			if (prop.type === 'select' && prop.select && prop.select.name) {
+				// Sanitize the tag name to be valid for Obsidian
+				const tagName = this.sanitizeTagName(prop.select.name);
+				if (tagName) {
+					tags.push(tagName);
+				}
+			}
+
+			// Check for multi_select property type
+			if (prop.type === 'multi_select' && prop.multi_select && Array.isArray(prop.multi_select)) {
+				for (const option of prop.multi_select) {
+					if (option.name) {
+						const tagName = this.sanitizeTagName(option.name);
+						if (tagName) {
+							tags.push(tagName);
+						}
+					}
+				}
+			}
+		}
+
+		return tags;
+	}
+
+	sanitizeTagName(name: string): string {
+		// Remove or replace characters that are not valid in Obsidian tags
+		// Obsidian tags can contain letters, numbers, underscores, and hyphens
+		// but cannot contain spaces or special characters
+		return name
+			.replace(/[^\w\-]/g, '_') // Replace non-word characters (except hyphens) with underscores
+			.replace(/^_+|_+$/g, '') // Remove leading and trailing underscores
+			.replace(/_+/g, '_'); // Replace multiple underscores with single underscore
 	}
 
 	async convertNotionBlock(block: any): Promise<NotionBlock> {
@@ -879,6 +954,15 @@ export default class ObsidiantionPlugin extends Plugin {
 		}
 	}
 
+	isPageFiltered(pageId: string): boolean {
+		// Normalize both the page ID and filtered IDs by removing hyphens for comparison
+		const normalizedPageId = pageId.replace(/-/g, '');
+		return this.settings.filteredPageIds.some(filteredId => {
+			const normalizedFilteredId = filteredId.replace(/-/g, '');
+			return normalizedPageId === normalizedFilteredId;
+		});
+	}
+
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
@@ -998,6 +1082,19 @@ class NotionSyncSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			.setName('Filtered Page IDs')
+			.setDesc('Comma-separated list of Notion page/database IDs to exclude from sync')
+			.addTextArea(text => text
+				.setPlaceholder('page-id-1, database-id-2, page-id-3')
+				.setValue(this.plugin.settings.filteredPageIds.join(', '))
+				.onChange(async (value) => {
+					// Parse the comma-separated list and clean up whitespace
+					const pageIds = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
+					this.plugin.settings.filteredPageIds = pageIds;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
 			.setName('Manual Sync')
 			.setDesc('Manually sync all Notion pages')
 			.addButton(button => button
@@ -1024,5 +1121,10 @@ class NotionSyncSettingTab extends PluginSettingTab {
 		const syncedCount = Object.keys(this.plugin.settings.syncedPages).length;
 		const countEl = containerEl.createDiv();
 		countEl.setText(`Synced pages: ${syncedCount}`);
+
+		// Show filtered pages count
+		const filteredCount = this.plugin.settings.filteredPageIds.length;
+		const filteredEl = containerEl.createDiv();
+		filteredEl.setText(`Filtered pages: ${filteredCount}`);
 	}
 }

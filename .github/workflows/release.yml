@@ -1,0 +1,98 @@
+name: Release Obsidiantion Plugin
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build plugin
+      run: npm run build
+
+    - name: Verify build files
+      run: |
+        echo "Checking for required files..."
+        ls -la main.js manifest.json styles.css || exit 1
+        echo "All required files found!"
+
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Create release package
+      run: |
+        mkdir release-files
+        cp main.js manifest.json styles.css LICENSE README.md release-files/
+        cd release-files
+        zip -r ../obsidiantion-${{ steps.get_version.outputs.VERSION }}.zip .
+        cd ..
+        echo "Created release package: obsidiantion-${{ steps.get_version.outputs.VERSION }}.zip"
+        ls -la obsidiantion-${{ steps.get_version.outputs.VERSION }}.zip
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        cat > release_notes.md << 'EOF'
+        ## 🚀 What's New in ${{ steps.get_version.outputs.VERSION }}
+        
+        ### ✨ Features
+        - 🔄 Enhanced Notion to Obsidian synchronization
+        - 📁 Intelligent folder mapping and file organization  
+        - 🖼️ Automatic image download and management
+        - 🏷️ Page filtering and property-to-tag conversion
+        - 🎯 Smart hierarchical content organization
+        
+        ### 📦 Installation
+        1. Download the `obsidiantion-${{ steps.get_version.outputs.VERSION }}.zip` file below
+        2. Extract it to your vault's `.obsidian/plugins/obsidiantion/` folder
+        3. Enable the plugin in Obsidian Settings → Community Plugins
+        4. Configure your Notion integration token in the plugin settings
+        
+        ### 🔧 Configuration
+        - **Notion Secret Key**: Get your integration token from [Notion Integrations](https://www.notion.so/my-integrations)
+        - **Root Folder**: Optional folder to contain all synced content
+        - **Image Folder**: Dedicated folder for downloaded images
+        - **Auto Sync**: Configure automatic sync intervals
+        - **Page Filtering**: Exclude specific pages by ID
+        
+        ### 📖 Documentation
+        See the [README.md](https://github.com/${{ github.repository }}/blob/${{ steps.get_version.outputs.VERSION }}/README.md) for detailed documentation and troubleshooting.
+        
+        ---
+        
+        **💾 Download Instructions:**
+        - Download the `obsidiantion-${{ steps.get_version.outputs.VERSION }}.zip` file attachment below
+        - Individual files (`main.js`, `manifest.json`, `styles.css`) are also available
+        - Do not download the "Source code" files unless you plan to build from source
+        EOF
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Obsidiantion ${{ steps.get_version.outputs.VERSION }}
+        body_path: release_notes.md
+        files: |
+          obsidiantion-${{ steps.get_version.outputs.VERSION }}.zip
+          main.js
+          manifest.json
+          styles.css
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

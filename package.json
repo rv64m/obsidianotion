@@ -1,6 +1,6 @@
 {
 	"name": "obsidianotion",
-	"version": "1.0.0",
+	"version": "0.1.0",
 	"description": "Sync Notion pages to Obsidian vault with automatic folder structure mapping.",
 	"main": "main.js",
 	"scripts": {
